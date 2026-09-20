@@ -1,0 +1,24 @@
+{
+  "name": "prayer-reminder-app",
+  "version": "1.0.0",
+  "description": "Group-based prayer reminder app with per-location prayer times, email notifications, and completion tracking.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "cron": "node src/cron.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "jsonwebtoken": "^9.0.2",
+    "memorystore": "^1.6.7",
+    "moment-timezone": "^0.5.45",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.15"
+  }
+}

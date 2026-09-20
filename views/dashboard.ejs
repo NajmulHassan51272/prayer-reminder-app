@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Prayer Reminder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            accent: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'scale-click': 'scale-click 0.2s ease-in-out',
+          },
+          keyframes: {
+            'scale-click': {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(0.95)' },
+            }
+          }
+        },
+      },
+    }
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="bg-slate-50 min-h-screen">
+  <%- include('components/navigation', { isAdmin, user }) %>
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+
+    <!-- Reminder Banner -->
+    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-500 rounded-xl p-6 mb-6 shadow-sm">
+      <span class="inline-block text-xs font-bold tracking-wider uppercase text-emerald-700 bg-white px-3 py-1 rounded-full mb-3"><%= reminder.type %></span>
+      <% if (reminder.arabic) { %>
+        <p class="text-right text-2xl text-slate-800 mb-3 leading-relaxed" style="font-family: 'Amiri', 'Noto Naskh Arabic', serif; direction: rtl;">
+          <%= reminder.arabic %>
+        </p>
+      <% } %>
+      <p class="text-slate-700 italic text-lg">&ldquo;<%= reminder.text %>&rdquo;</p>
+      <p class="text-slate-500 text-sm mt-2">— <%= reminder.reference %></p>
+    </div>
+
+    <!-- Next Prayer Countdown -->
+    <% if (nextPrayer) { %>
+      <div class="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-8 mb-6 text-center shadow-lg shadow-emerald-200">
+        <p class="text-emerald-100 text-sm font-bold tracking-wider uppercase mb-2">
+          <%= nextPrayer.isTomorrow ? 'Next prayer (tomorrow)' : 'Next prayer' %>
+        </p>
+        <p class="text-white text-2xl font-bold">
+          <span class="text-amber-300"><%= nextPrayer.name %></span>
+          in <span id="countdown-timer" data-at="<%= nextPrayer.atUTC.toISOString() %>" class="font-mono">calculating…</span>
+        </p>
+      </div>
+    <% } %>
+
+    <!-- Welcome Card -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-md">
+      <h1 class="text-2xl font-bold text-slate-800 mb-2">Assalamu Alaikum, <%= user.name %> 👋</h1>
+      <p class="text-slate-500"><%= user.city %>, <%= user.country %></p>
+    </div>
+
+    <!-- Group Status -->
+    <% if (!group) { %>
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-md">
+        <h2 class="text-xl font-bold text-slate-800 mb-3">You're not in a group yet</h2>
+        <p class="text-slate-500 mb-4">Create your own group to start tracking prayers with friends and family, then invite members via email.</p>
+        <div class="flex gap-3">
+          <a href="/group/new" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors shadow-lg shadow-emerald-200">Create a group</a>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-md">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-slate-800"><%= group.name %></h2>
+          <% if (isAdmin) { %>
+            <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Admin</span>
+          <% } %>
+        </div>
+        <p class="text-slate-500"><%= memberCount %>/30 members</p>
+      </div>
+    <% } %>
+
+    <!-- Today's Prayer Times -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-6 shadow-md">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-bold text-slate-800">Today's prayer times</h2>
+        <!-- Progress Indicator -->
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <p class="text-sm text-slate-500">Daily Progress</p>
+            <p class="text-lg font-bold text-emerald-600"><%= completedCount %>/5</p>
+          </div>
+          <div class="w-16 h-16 relative">
+            <svg class="w-16 h-16 transform -rotate-90">
+              <circle cx="32" cy="32" r="28" stroke="#e2e8f0" stroke-width="4" fill="none"/>
+              <circle cx="32" cy="32" r="28" stroke="#10b981" stroke-width="4" fill="none" 
+                      stroke-dasharray="<%= (completedCount / 5) * 175.9 %> 175.9" 
+                      stroke-linecap="round"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-sm font-bold text-emerald-600"><%= Math.round((completedCount / 5) * 100) %>%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <% if (apiError) { %>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700"><%= apiError %></div>
+      <% } else if (!todayTimes) { %>
+        <p class="text-slate-500">Times will appear once your location is set.</p>
+      <% } else { %>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <% PRAYERS.forEach(function(p) { %>
+            <% var st = statusMap[p] || 'none'; %>
+            <% var isActive = st === 'done'; %>
+            <% var isMissed = st === 'missed'; %>
+            <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 text-center transition-all hover:shadow-md">
+              <div class="font-bold text-emerald-700 text-sm mb-1"><%= p %></div>
+              <div class="text-2xl font-bold text-slate-800 mb-2"><%= todayTimes[p.toLowerCase()] %></div>
+              
+              <!-- Status Badge -->
+              <div class="mb-3">
+                <% if (st === 'done') { %>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                    <span class="mr-1">✓</span> Done
+                  </span>
+                <% } else if (st === 'missed') { %>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                    <span class="mr-1">✗</span> Missed
+                  </span>
+                <% } else if (st === 'pending') { %>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                    <span class="mr-1">○</span> Pending
+                  </span>
+                <% } else { %>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-600">
+                    <span class="mr-1">○</span> Not yet
+                  </span>
+                <% } %>
+              </div>
+              
+              <!-- Interactive Buttons -->
+              <div class="flex gap-2 justify-center">
+                <form method="POST" action="/prayer/mark" class="flex-1">
+                  <input type="hidden" name="prayer_name" value="<%= p %>" />
+                  <input type="hidden" name="date" value="<%= today %>" />
+                  <input type="hidden" name="status" value="done" />
+                  <button type="submit" 
+                          class="w-full py-2 px-3 rounded-lg text-xs font-bold transition-all
+                                 <%= isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-white text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-50' %>
+                                 <%= isActive ? 'animate-pulse-slow' : '' %>
+                                 active:scale-95">
+                    ✅ Prayed
+                  </button>
+                </form>
+                <form method="POST" action="/prayer/mark" class="flex-1">
+                  <input type="hidden" name="prayer_name" value="<%= p %>" />
+                  <input type="hidden" name="date" value="<%= today %>" />
+                  <input type="hidden" name="status" value="missed" />
+                  <button type="submit" 
+                          class="w-full py-2 px-3 rounded-lg text-xs font-bold transition-all
+                                 <%= isMissed ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-white text-red-500 border-2 border-red-200 hover:bg-red-50' %>
+                                 active:scale-95">
+                    ❌ Not yet
+                  </button>
+                </form>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <p class="text-slate-400 text-sm mt-4 text-center">Times auto-refresh daily and are calculated for your city (<%= user.city %>)</p>
+      <% } %>
+    </div>
+
+    <!-- Recent History -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-md">
+      <h2 class="text-xl font-bold text-slate-800 mb-4">Your recent history</h2>
+      <% if (recentHistory.length === 0) { %>
+        <p class="text-slate-500">No responses logged yet — check back after your first reminder email.</p>
+      <% } else { %>
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200">
+                <th class="text-left py-4 px-4 text-sm font-semibold text-slate-600">Date</th>
+                <th class="text-left py-4 px-4 text-sm font-semibold text-slate-600">Prayer</th>
+                <th class="text-left py-4 px-4 text-sm font-semibold text-slate-600">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% recentHistory.forEach(function(r) { %>
+                <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td class="py-4 px-4 text-sm text-slate-700"><%= r.date %></td>
+                  <td class="py-4 px-4 text-sm text-slate-700"><%= r.prayer_name %></td>
+                  <td class="py-4 px-4">
+                    <% if (r.status === 'done') { %>
+                      <span class="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors">
+                        <span class="mr-2">✓</span> Done
+                      </span>
+                    <% } else if (r.status === 'missed') { %>
+                      <span class="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors">
+                        <span class="mr-2">✗</span> Missed
+                      </span>
+                    <% } else if (r.status === 'pending') { %>
+                      <span class="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors">
+                        <span class="mr-2">○</span> Pending
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex items-center px-4 py-2 rounded-full text-xs font-bold bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors">
+                        <span class="mr-2">○</span> <%= r.status %>
+                      </span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+  </div>
+
+  <script>
+    (function () {
+      var el = document.getElementById('countdown-timer');
+      if (!el) return;
+      var target = new Date(el.getAttribute('data-at')).getTime();
+
+      function render() {
+        var diff = target - Date.now();
+        if (diff <= 0) {
+          el.textContent = 'now';
+          setTimeout(function() { location.reload(); }, 5000);
+          return;
+        }
+        
+        var totalSeconds = Math.floor(diff / 1000);
+        var hours = Math.floor(totalSeconds / 3600);
+        var minutes = Math.floor((totalSeconds % 3600) / 60);
+        var seconds = totalSeconds % 60;
+        
+        var parts = [];
+        if (hours > 0) parts.push(hours + (hours === 1 ? ' hr' : ' hrs'));
+        if (minutes > 0) parts.push(minutes + (minutes === 1 ? ' min' : ' mins'));
+        parts.push(seconds + (seconds === 1 ? ' sec' : ' secs'));
+        
+        el.textContent = parts.join(' ');
+      }
+
+      render();
+      setInterval(render, 1000); // Update every second for real-time ticking
+    })();
+  </script>
+</body>
+</html>

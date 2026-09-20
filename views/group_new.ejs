@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Group — Prayer Reminder</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <%- include('_nav', { isAdmin: false }) %>
+  <div class="container">
+    <div class="card">
+      <h1>Create a group</h1>
+      <p class="muted">You'll become this group's admin. Groups are capped at 30 members and the join code is permanent.</p>
+      <% if (error) { %><div class="error"><%= error %></div><% } %>
+      <form method="POST" action="/group/new">
+        <div class="form-group">
+          <label>Group name</label>
+          <input type="text" name="name" placeholder="e.g. Family Prayer Circle" required />
+        </div>
+        <button type="submit">Create Group</button>
+        <a href="/group/join" class="btn secondary">Join an existing group instead</a>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

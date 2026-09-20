@@ -1,0 +1,55 @@
+services:
+  # Web Service
+  - type: web
+    name: prayer-reminder-app
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: BASE_URL
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+    disk:
+      name: data
+      mountPath: /app/data
+      size: 1
+
+  # Cron Job for Prayer Scheduler
+  - type: cron
+    name: prayer-scheduler
+    plan: free
+    schedule: "*/5 * * * *"
+    env: node
+    buildCommand: npm install
+    startCommand: npm run cron
+    envVars:
+      - key: BASE_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: PRAYER_CALC_METHOD
+        sync: false
+      - key: FOLLOWUP_DELAY_MINUTES
+        sync: false
+      - key: MISSED_AFTER_MINUTES
+        sync: false
+    disk:
+      name: data
+      mountPath: /app/data
+      size: 1
