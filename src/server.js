@@ -96,17 +96,31 @@ module.exports = app;
 
 // Only start the server if not running in Vercel
 if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Prayer Reminder App running at http://localhost:${PORT}`);
-    
-    // Only start the internal scheduler if CRON_SECRET and CRON_MODE are not set
-    // This allows using external cron services in production
-    if (!process.env.CRON_SECRET && !process.env.CRON_MODE) {
-      console.log('[scheduler] Starting internal node-cron scheduler (development mode)');
-      scheduler.start();
-    } else {
-      console.log('[scheduler] Internal scheduler disabled (production mode - using external cron or Render cron job)');
-    }
-  });
+  let PORT = parseInt(process.env.PORT || "3000", 10);
+  
+  const startServer = (port) => {
+    const server = app.listen(port, () => {
+      console.log(`Prayer Reminder App running at http://localhost:${port}`);
+      
+      // Only start the internal scheduler if CRON_SECRET and CRON_MODE are not set
+      // This allows using external cron services in production
+      if (!process.env.CRON_SECRET && !process.env.CRON_MODE) {
+        console.log('[scheduler] Starting internal node-cron scheduler (development mode)');
+        scheduler.start();
+      } else {
+        console.log('[scheduler] Internal scheduler disabled (production mode - using external cron or Render cron job)');
+      }
+    });
+
+    server.on('error', (e) => {
+      if (e.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is in use, trying ${port + 1}...`);
+        startServer(port + 1);
+      } else {
+        console.error(e);
+      }
+    });
+  };
+
+  startServer(PORT);
 }

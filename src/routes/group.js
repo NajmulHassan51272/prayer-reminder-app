@@ -82,11 +82,13 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
   try {
     // Skip the user existence check to avoid permission issues
     // Just create the invitation and let the signup process handle it
+    console.log('[group-invite] Fetching group members...');
     const groupMembers = await db.getGroupMembers(req.group.id);
     if (groupMembers.length >= MAX_MEMBERS) {
       return res.status(400).json({ success: false, error: "This group is full (30/30 members)." });
     }
 
+    console.log('[group-invite] Fetching pending invitations...');
     // Check for existing invitations (both pending and expired)
     const existingInvitations = await db.getPendingInvitationsByEmail(normalizedEmail);
     const existingInvitation = existingInvitations.find(inv => inv.group_id === req.group.id);
@@ -108,6 +110,7 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
       // If explicitly requesting to resend or it's been more than 24 hours
       if (resend || hoursSinceInvitation >= 24) {
         // Mark old invitation as expired and create a new one
+        console.log('[group-invite] Marking old invitation as expired...');
         await db.updateInvitation(existingInvitation.id, { status: 'expired' });
       } else {
         return res.status(400).json({ success: false, error: "An invitation has already been sent to this email." });
@@ -119,6 +122,7 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
       // Just proceed to create new invitation (old one stays expired)
     }
 
+    console.log('[group-invite] Generating token and creating invitation...');
     const token = await generateUniqueToken();
     const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     

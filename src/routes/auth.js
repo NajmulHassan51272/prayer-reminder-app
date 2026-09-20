@@ -12,23 +12,18 @@ router.get("/register", async (req, res) => {
   
   if (inviteToken) {
     try {
-      const { data, error } = await supabase
-        .from('group_invitations')
-        .select(`
-          *,
-          groups:group_id (name),
-          inviter:invited_by (name)
-        `)
-        .eq('token', inviteToken)
-        .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString())
-        .single();
+      // Use existing db helper to fetch the invitation
+      const data = await db.getInvitationByToken(inviteToken);
       
-      if (!error && data) {
+      if (data && data.status === 'pending' && new Date(data.expires_at) > new Date()) {
+        // Fetch group and inviter details manually to avoid complex join issues
+        const group = await db.getGroupById(data.group_id);
+        const inviter = await db.getUserProfile(data.invited_by);
+        
         invitation = {
           ...data,
-          group_name: data.groups?.name,
-          inviter_name: data.inviter?.name
+          group_name: group ? group.name : 'Unknown Group',
+          inviter_name: inviter ? inviter.name : 'Unknown User'
         };
         console.log(`[register] Found valid invitation:`, { id: invitation.id, group: invitation.group_name, email: invitation.email });
       } else {
@@ -117,6 +112,19 @@ router.post("/register", async (req, res) => {
         });
         
         console.log(`[register] Successfully added user ${userId} to group ${invitation.group_id}`);
+        
+        // Send email notification that they have been added to the group
+        try {
+          const { sendMail, groupAddedEmailHtml } = require("../services/email");
+          await sendMail({
+            to: email.toLowerCase().trim(),
+            subject: `You've been added to ${invitation.group_name}`,
+            html: groupAddedEmailHtml(invitation.inviter_name, invitation.group_name),
+          });
+          console.log(`[register] Sent group added email to ${email}`);
+        } catch (emailErr) {
+          console.error(`[register] Error sending group added email:`, emailErr);
+        }
       } else {
         console.log(`[register] Invalid or expired invitation token: ${invite_token}`);
       }
