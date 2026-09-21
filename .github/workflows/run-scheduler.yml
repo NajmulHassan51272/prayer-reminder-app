@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger prayer scheduler
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           curl -sS -X POST "$CRON_URL" \
             -H "Authorization: Bearer $CRON_SECRET" \

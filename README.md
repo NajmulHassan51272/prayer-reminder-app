@@ -153,13 +153,16 @@ delay). That means **the tick must run at least every 5 minutes** or reminders
 will be missed. Pick one (or both) of the following:
 
 ### Option A — Vercel Cron (`vercel.json`)
-`vercel.json` defines a cron that hits `/api/cron/prayer-scheduler` every 5
-minutes:
+`vercel.json` registers a cron that hits `/api/cron/prayer-scheduler`:
 ```json
-"crons": [{ "path": "/api/cron/prayer-scheduler", "schedule": "*/5 * * * *" }]
+"crons": [{ "path": "/api/cron/prayer-scheduler", "schedule": "0 0 * * *" }]
 ```
-> **Plan limit:** Vercel's Hobby plan only allows cron jobs **once per day**; the
-> `*/5` schedule requires a **Pro** plan. On Hobby, use Option B.
+> **Plan limit:** Vercel's **Hobby** plan only allows cron jobs **once per day**
+> (a `*/5` schedule makes the deploy fail with "Hobby accounts are limited to
+> daily cron jobs"), so the committed schedule is daily — it serves as a
+> once-a-day refresh fallback only. For on-time reminders on Hobby, enable
+> Option B. Upgrade to **Pro** if you want Vercel itself to run every 5 minutes
+> (change the schedule back to `*/5 * * * *`).
 
 Vercel automatically sends `Authorization: Bearer <CRON_SECRET>` on cron
 requests **when a `CRON_SECRET` environment variable is set** on the project — so
