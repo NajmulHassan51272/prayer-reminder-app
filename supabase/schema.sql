@@ -171,3 +171,16 @@ CREATE POLICY "Users can view invitations for their email" ON group_invitations
 DROP POLICY IF EXISTS "Authenticated users can create invitations" ON group_invitations;
 CREATE POLICY "Authenticated users can create invitations" ON group_invitations
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Sessions table (serverless-safe login persistence).
+-- The Express app reads/writes this ONLY with the service-role key, which
+-- bypasses RLS; enabling RLS with no policies blocks any direct anon access.
+CREATE TABLE IF NOT EXISTS sessions (
+  sid TEXT PRIMARY KEY,
+  sess JSONB NOT NULL,
+  expire TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire);
+
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;

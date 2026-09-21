@@ -1,4 +1,11 @@
-const { supabase, supabaseAdmin } = require('./supabase');
+// This is a trusted, server-side data layer. The app authenticates users with
+// cookie sessions and never forwards a per-user JWT to PostgREST, so RLS
+// policies based on auth.uid() can never match for requests made here. Using
+// the anon key therefore silently returns zero rows (and blocks writes) once
+// RLS is enabled — breaking login, dashboards, and the scheduler. Every query
+// in this module must run with the service-role key, which bypasses RLS.
+const { supabaseAdmin } = require('./supabase');
+const supabase = supabaseAdmin;
 
 // Database helper functions using Supabase
 const db = {

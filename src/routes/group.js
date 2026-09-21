@@ -80,8 +80,6 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
   }
 
   try {
-    // Skip the user existence check to avoid permission issues
-    // Just create the invitation and let the signup process handle it
     console.log('[group-invite] Fetching group members...');
     const groupMembers = await db.getGroupMembers(req.group.id);
     if (groupMembers.length >= MAX_MEMBERS) {
@@ -89,43 +87,76 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
     }
 
     console.log('[group-invite] Fetching pending invitations...');
-    // Check for existing invitations (both pending and expired)
+    // Existing pending/expired invitations for this email + group (spam guard + reuse).
     const existingInvitations = await db.getPendingInvitationsByEmail(normalizedEmail);
     const existingInvitation = existingInvitations.find(inv => inv.group_id === req.group.id);
-    
-    // If there's a recent pending invitation (within last 24 hours), prevent spam
+
+    // Does a user with this email already have an account?
+    // (This supabase-js build has no auth.admin.getUserByEmail, so look it up
+    // from the paginated admin user list — same approach used in routes/auth.js.)
+    let authUser = null;
+    try {
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+      authUser = (usersData && usersData.users || []).find((u) => (u.email || '').toLowerCase() === normalizedEmail) || null;
+    } catch (e) {
+      console.error('[group-invite] Error looking up existing user:', e.message);
+      authUser = null;
+    }
+
+    // ---- CASE 1: already a registered user -> add them to the group instantly ----
+    if (authUser) {
+      const profile = await db.getUserProfile(authUser.id);
+      if (profile && profile.group_id) {
+        if (profile.group_id === req.group.id) {
+          return res.json({ success: true, message: `${normalizedEmail} is already a member of this group.` });
+        }
+        return res.status(400).json({ success: false, error: `${normalizedEmail} already belongs to another group.` });
+      }
+
+      console.log(`[group-invite] ${normalizedEmail} exists — adding instantly to group ${req.group.id}`);
+      await db.updateUserProfile(authUser.id, { group_id: req.group.id });
+
+      // Mark any pending invitation as accepted so it can't be reused later.
+      if (existingInvitation && existingInvitation.status === 'pending') {
+        await db.updateInvitation(existingInvitation.id, { status: 'accepted', accepted_at: new Date().toISOString() });
+      }
+
+      const result = await sendMail({
+        to: normalizedEmail,
+        subject: `You've been added to ${req.group.name}`,
+        html: groupAddedEmailHtml(req.user.name, req.group.name),
+      });
+      return res.json({
+        success: true,
+        message: result.success
+          ? `${normalizedEmail} was added to the group.`
+          : `${normalizedEmail} was added to the group (email delivery failed).`,
+      });
+    }
+
+    // ---- CASE 2: not registered yet -> send an invitation with a signup link ----
+    // If there's a recent pending invitation (within last 24 hours), prevent spam.
     if (existingInvitation && existingInvitation.status === 'pending') {
       const invitationAge = Date.now() - new Date(existingInvitation.created_at).getTime();
       const hoursSinceInvitation = invitationAge / (1000 * 60 * 60);
-      
-      // If invitation was sent less than 24 hours ago and not explicitly requested to resend
+
       if (hoursSinceInvitation < 24 && !resend) {
         const hoursLeft = Math.ceil(24 - hoursSinceInvitation);
-        return res.status(400).json({ 
-          success: false, 
+        return res.status(400).json({
+          success: false,
           error: `An invitation was already sent ${hoursSinceInvitation < 1 ? 'recently' : hoursSinceInvitation.toFixed(1) + ' hours ago'}. Please wait ${hoursLeft} hours before sending another or use the resend option.`
         });
       }
-      
-      // If explicitly requesting to resend or it's been more than 24 hours
-      if (resend || hoursSinceInvitation >= 24) {
-        // Mark old invitation as expired and create a new one
-        console.log('[group-invite] Marking old invitation as expired...');
-        await db.updateInvitation(existingInvitation.id, { status: 'expired' });
-      } else {
-        return res.status(400).json({ success: false, error: "An invitation has already been sent to this email." });
-      }
-    }
-    
-    // If there's an expired invitation, allow creating a new one
-    if (existingInvitation && existingInvitation.status === 'expired') {
-      // Just proceed to create new invitation (old one stays expired)
+
+      // Explicit resend, or older than 24h: expire the old one and create a fresh link.
+      console.log('[group-invite] Marking old invitation as expired...');
+      await db.updateInvitation(existingInvitation.id, { status: 'expired' });
     }
 
     console.log('[group-invite] Generating token and creating invitation...');
     const token = await generateUniqueToken();
     const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    
+
     await db.createInvitation({
       group_id: req.group.id,
       email: normalizedEmail,
@@ -137,17 +168,17 @@ router.post("/group/invite", requireLogin, requireGroupAdmin, async (req, res) =
     // Send invitation email
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     const signupUrl = `${baseUrl}/register?invite=${token}`;
-    
+
     console.log(`[group-invite] Creating invitation for ${normalizedEmail} to group ${req.group.id}`);
     console.log(`[group-invite] Signup URL: ${signupUrl}`);
-    
+
     try {
       const result = await sendMail({
         to: normalizedEmail,
         subject: `You're invited to join ${req.group.name}`,
         html: invitationEmailHtml(req.user.name, req.group.name, signupUrl),
       });
-      
+
       if (result.success) {
         const message = resend ? "Invitation resent successfully." : "Invitation sent successfully.";
         console.log(`[group-invite] ${message}`);

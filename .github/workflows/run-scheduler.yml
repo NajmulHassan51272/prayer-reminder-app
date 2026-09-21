@@ -1,0 +1,31 @@
+name: Run prayer scheduler
+
+# Backup / plan-independent trigger for the prayer reminder scheduler.
+#
+# Vercel's built-in cron (see vercel.json) only allows a once-per-day schedule on
+# the Hobby plan. This GitHub Action calls the same secured endpoint every 5
+# minutes on ANY plan, so reminders and follow-ups fire on time.
+#
+# To enable it, add these two Repository Secrets (GitHub -> Settings -> Secrets
+# and variables -> Actions):
+#   CRON_URL     e.g. https://your-app.vercel.app/api/cron/prayer-scheduler
+#   CRON_SECRET  the same value you set as the CRON_SECRET env var on Vercel
+#
+# Note: GitHub schedules Actions at a *minimum* interval of 5 minutes, which
+# matches the scheduler's reminder windows in src/services/scheduler.js.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you run it manually from the Actions tab
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger prayer scheduler
+        run: |
+          curl -sS -X POST "$CRON_URL" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --fail-with-body

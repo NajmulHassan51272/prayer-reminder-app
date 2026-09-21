@@ -93,14 +93,14 @@ function reminderEmailHtml(user, prayerName, time) {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Time for ${prayerName}</title>
+      <title>${prayerName} is coming up</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc;">
       <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
         <!-- Header -->
         <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center;">
           <div style="font-size: 48px; margin-bottom: 16px;">🕌</div>
-          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Time for ${prayerName}</h1>
+          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">${prayerName} is coming up</h1>
         </div>
         
         <!-- Content -->
@@ -111,15 +111,15 @@ function reminderEmailHtml(user, prayerName, time) {
           
           <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
             <p style="color: #166534; margin: 0; font-size: 18px; font-weight: 600;">
-              It's <strong>${time}</strong> in ${user.city}
+              <strong>${prayerName}</strong> today is at <strong>${time}</strong>
             </p>
             <p style="color: #166534; margin: 8px 0 0; font-size: 16px;">
-              Time for <strong>${prayerName}</strong> prayer
+              in ${user.city} — get ready, it's almost time to pray.
             </p>
           </div>
           
           <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin: 24px 0 0;">
-            You'll receive a follow-up message shortly to help you track whether you've completed this prayer.
+            You'll receive a follow-up message after the prayer time to help you track whether you've completed it.
           </p>
         </div>
         

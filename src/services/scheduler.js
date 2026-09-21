@@ -1,12 +1,16 @@
 const cron = require("node-cron");
 const moment = require("moment-timezone");
 const db = require("../db");
-const { supabase } = require("../supabase");
+// Service-role client: the scheduler runs outside any user session, so it must
+// bypass RLS to read all user profiles and look up each user's auth email.
+const { supabaseAdmin: supabase } = require("../supabase");
 const { getOrFetchTodayTimes, todayStr } = require("./prayerTimes");
 const { sendMail, reminderEmailHtml, followupEmailHtml } = require("./email");
 const { createResponseToken } = require("../utils/token");
 
 const PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+// "Before prayer" reminder is sent this many minutes ahead of the prayer time.
+const PRE_REMINDER_MIN = Number(process.env.PRE_REMINDER_MINUTES || 15);
 const FOLLOWUP_DELAY_MIN = Number(process.env.FOLLOWUP_DELAY_MINUTES || 45);
 const MISSED_AFTER_MIN = Number(process.env.MISSED_AFTER_MINUTES || 180);
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
@@ -85,18 +89,20 @@ async function tick() {
         const prayerMoment = moment.tz(`${date} ${timeStr}`, "YYYY-MM-DD HH:mm", row.timezone);
         if (!prayerMoment.isValid()) continue;
 
-        const minutesSincePrayer = now.diff(prayerMoment, "minutes");
+        const minutesSincePrayer = now.diff(prayerMoment, "minutes"); // >0 once the time has passed
+        const minutesUntilPrayer = prayerMoment.diff(now, "minutes");  // >0 while still upcoming
 
-        // 1) Send the "it's time" reminder once, within a small window after the exact time.
-        if (minutesSincePrayer >= 0 && minutesSincePrayer <= 10) {
+        // 1) BEFORE the prayer: a single "time to prepare" reminder, sent within the
+        //    lead window ahead of the prayer time (default: 15 minutes before).
+        if (minutesUntilPrayer > 0 && minutesUntilPrayer <= PRE_REMINDER_MIN) {
           if (!(await alreadyLogged(user.id, prayerName, date, "reminder"))) {
             // Get user email from auth.users
             const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
             if (!authUser.user) continue;
-            
+
             const result = await sendMail({
               to: authUser.user.email,
-              subject: `Time for ${prayerName}`,
+              subject: `🕌 ${prayerName} is at ${timeStr} — time to prepare`,
               html: reminderEmailHtml(user, prayerName, timeStr),
             });
             

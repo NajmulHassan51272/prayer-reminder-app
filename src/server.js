@@ -8,8 +8,16 @@ const groupRoutes = require("./routes/group");
 const dashboardRoutes = require("./routes/dashboard");
 const responseRoutes = require("./routes/response");
 const scheduler = require("./services/scheduler");
+const { SupabaseSessionStore } = require("./sessionStore");
+const { supabaseAdmin } = require("./supabase");
 
 const app = express();
+
+// Vercel terminates TLS at its edge, so req.secure/req.ip are wrong without
+// this. Trusting the proxy lets express-session set Secure cookies correctly
+// over HTTPS (otherwise the browser silently drops the session cookie and you
+// get logged out immediately after logging in).
+app.set("trust proxy", 1);
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "..", "views"));
@@ -18,17 +26,26 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add JSON parsing for API routes
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Simple memory store for sessions (works for Vercel)
-const MemoryStore = require('memorystore')(session);
+// Sessions are stored in Supabase (see src/sessionStore.js) instead of in RAM,
+// so they survive serverless cold starts and redeploys on Vercel. On a purely
+// local run we fall back to the memory store to avoid needing the DB.
+const MemoryStore = require("memorystore")(session);
+const sessionStore = process.env.VERCEL
+  ? new SupabaseSessionStore({ client: supabaseAdmin })
+  : new MemoryStore({ checkPeriod: 86400000 });
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "dev_secret_change_me",
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 }, // 7 days
-    store: new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    })
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      secure: process.env.VERCEL ? true : false, // HTTPS-only cookie in production
+      sameSite: "lax",
+      httpOnly: true,
+    },
+    store: sessionStore
   })
 );
 

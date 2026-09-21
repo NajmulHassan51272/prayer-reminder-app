@@ -116,10 +116,12 @@ router.post("/register", async (req, res) => {
         // Send email notification that they have been added to the group
         try {
           const { sendMail, groupAddedEmailHtml } = require("../services/email");
+          const group = await db.getGroupById(invitation.group_id);
+          const inviter = await db.getUserProfile(invitation.invited_by);
           await sendMail({
             to: email.toLowerCase().trim(),
-            subject: `You've been added to ${invitation.group_name}`,
-            html: groupAddedEmailHtml(invitation.inviter_name, invitation.group_name),
+            subject: `You've been added to ${group ? group.name : 'your prayer group'}`,
+            html: groupAddedEmailHtml(inviter ? inviter.name : 'The group admin', group ? group.name : 'your prayer group'),
           });
           console.log(`[register] Sent group added email to ${email}`);
         } catch (emailErr) {

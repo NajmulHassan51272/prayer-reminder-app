@@ -1,7 +1,9 @@
 const axios = require("axios");
 const moment = require("moment-timezone");
 const db = require("../db");
-const { supabase } = require("../supabase");
+// Service-role client: profile queries here run outside a user session and must
+// bypass RLS (the anon key returns zero rows under RLS).
+const { supabaseAdmin: supabase } = require("../supabase");
 
 const METHOD = process.env.PRAYER_CALC_METHOD || 1;
 const PRAYERS = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
